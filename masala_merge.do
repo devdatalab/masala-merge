@@ -1899,7 +1899,7 @@ qui {
   /*****************************************************************************************************/
   cap prog drop synonym_fix
   prog def synonym_fix
-  {
+
     syntax varname, SYNfile(string) [GENerate(name) replace group(varlist) TARGETfield(string) TARGETGROUP(string)] 
     
     /* put variable to replace using synonym_fix in `varname' */
@@ -1938,7 +1938,7 @@ qui {
   
         /* read the synfile by using import delimited with ufs-8 encoding */
         import delimited "`synfile'", clear delim(",") varn(1) encoding("utf-8")
-  
+
         /* targetfield: renaming the target name variable from the replacement file to match the master dataset */
   
         /* if a target variable field was specified, rename the insheeted target field variable to match the varname in master dataset */
@@ -1960,6 +1960,10 @@ qui {
           }
         }
         
+        /* We require all replacements to be strings. Enforce this in case Stata
+           imported an encoded list as numbers. */
+        tostring master `varname', replace force
+      
        /* targetgroup: renaming group variables from replacement file to match master dataset */
   
        /* if a target group was specified, rename the target group names from csv to match master group varnames passed in with group() */
@@ -2022,7 +2026,7 @@ qui {
       replace `name' = master if !mi(master)
   
       drop master _merge
-    }
+
   end
   /* *********** END program synonym_fix ***************************************** */
   
