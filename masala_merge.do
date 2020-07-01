@@ -1033,7 +1033,11 @@ qui {
       
       /* read in the manual match sheet */
       import delimited using `manual_file', varn(1) clear
-  
+
+      /* make sure idmaster and idusing are strings */
+      cap tostring `idmaster', replace
+      cap tostring `idusing', replace
+
       /* save as a temp stata file */
       tempfile manual_csv
       save `manual_csv'
