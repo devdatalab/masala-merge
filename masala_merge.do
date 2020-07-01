@@ -127,7 +127,8 @@ qui {
       /* name_clean the fuzzy merge string var */
       if "`nameclean'" == "" {
         name_clean `s1', generate(_`s1')
-      }    
+      }
+
       /* if nonameclean specified, simply generate _s1 */
       else {
         gen _`s1' = `s1'
@@ -249,7 +250,11 @@ qui {
   
         /* read in the manual match sheet */
         import delimited using `manual_file', varn(1) clear
-  
+
+        /* make sure idmaster and idusing are strings */
+        cap tostring `idmaster', replace
+        cap tostring `idusing', replace
+
         /* restrict dataset to the manual matches that occur in the master dataset */
         merge 1:1 `idmaster' using `master_working', keep(match) keepusing(`idmaster') nogen
         
