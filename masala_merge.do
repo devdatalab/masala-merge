@@ -1947,6 +1947,7 @@ qui {
   
         /* read the synfile by using import delimited with ufs-8 encoding */
         import delimited "`synfile'", clear delim(",") varn(1) encoding("utf-8")
+        tostring `varname', replace force
         recast str `varname'
         /* targetfield: renaming the target name variable from the replacement file to match the master dataset */
   
