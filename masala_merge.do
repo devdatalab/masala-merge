@@ -68,9 +68,9 @@ qui {
   prog def masala_merge
   {
     syntax [varlist] using/, S1(string) idmaster(string) idusing(string) ///
-                             [LISTvars(varlist) MANUAL_file(string) CSVsort(string) METHOD(string) FUZziness(real 1.0) nopreserve nonameclean /// 
+                             [LISTvars(varlist) MANUAL_file(string) CSVsort(string) METHOD(string) FUZziness(real 1.0) ///
                               MINSCORE(real 0.0)  MINBIGRAM(real 0.0) ///
-                              OUTfile(string) KEEPUSING(passthru)] 
+                              OUTfile(string) KEEPUSING(passthru) nopreserve nonameclean] 
     
     quietly {
   
@@ -82,7 +82,7 @@ qui {
       /* create a random 5-6 digit number to make file names for this merge unique */
       local time = real(subinstr(`"`c(current_time)'"', ":", "", .))
       local nonce = floor(`time' * runiform() + 1)
-      
+
       /* set default value for outfile */
       if mi("`outfile'") {
         tempfile outfile
@@ -130,7 +130,7 @@ qui {
       }
 
       /* if nonameclean specified, simply generate _s1 */
-      else {
+      if "`nameclean'" == "nonameclean" {
         gen _`s1' = `s1'
       }
       label var _`s1' "`s1', used in merge"
@@ -185,7 +185,7 @@ qui {
         name_clean `s1', generate(_`s1')
       }    
       /* if nonameclean specified, simply generate _s1 */
-      else {
+      if "`nameclean'" == "nonameclean" {
         gen _`s1' = `s1'
       }
       label var _`s1' "`s1', used in merge"
@@ -244,7 +244,7 @@ qui {
   
       /* reload the master data */
       use `master_working', clear
-          
+
       /* if the manual match file has been specified */
       if !mi("`manual_file'") {
   
@@ -252,8 +252,8 @@ qui {
         import delimited using `manual_file', varn(1) clear
 
         /* make sure idmaster and idusing are strings */
-        cap tostring `idmaster', replace
-        cap tostring `idusing', replace
+        tostring `idmaster', replace
+        tostring `idusing', replace
 
         /* restrict dataset to the manual matches that occur in the master dataset */
         merge 1:1 `idmaster' using `master_working', keep(match) keepusing(`idmaster') nogen
@@ -830,7 +830,7 @@ qui {
           exit 9
         }
       }
-  
+
       /* export all manual matches to the manual match file */
       export delimited "`outfile'", replace
     }
