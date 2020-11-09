@@ -25,4 +25,17 @@ ren district lgd_district_name
 /* run masala_merge */
 masala_merge lgd_state_name using $masalapath/tests/data/standard_district_names, s1(lgd_district_name) minbigram(0.6) minscore(0.7) outfile($masalapath/tests/data/matched_districts)
 
+/* to make additional manual matches:
+  1. open the unmatched observations file
+  2. there are any matches you want to make, copy the idusing variable into the idmatch column
+  3. save the file 
+  4. run process_manual_matches:
 
+e.g. process_manual_matches, outfile($masalapath/tests/data/manual_matches) infile($tmp/unmatched_observations_826.csv) s1(lgd_district_name) idmaster(idm_master) idusing(idu_using)
+*/
+
+/* you can then rerun masala merge with the manual matches you have just output */
+use $masalapath/tests/data/covid_case_data, clear
+ren state lgd_state_name
+ren district lgd_district_name
+masala_merge lgd_state_name using $masalapath/tests/data/standard_district_names, s1(lgd_district_name) manual_file($masalapath/tests/data/manual_matches.csv) minbigram(0.6) minscore(0.7) outfile($masalapath/tests/data/matched_districts)

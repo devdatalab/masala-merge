@@ -140,8 +140,8 @@ qui {
 
       /* create an idmaster if it is missing */
       if "`idmaster'" == "" {
-        egen idmaster = concat(`_varlist' `s1')
-        local idmaster "idmaster"
+        egen idmaster = concat(`_varlist' `s1'), punct("-")
+        local idmaster "idm"
       }
 
       /* store the original idmaster */
@@ -209,8 +209,8 @@ qui {
 
       /* create an idmaster if it is missing */
       if "`idusing'" == "" {
-        egen idusing = concat(`_varlist' `s1')
-        local idusing "idusing"
+        egen idusing = concat(`_varlist' `s1'), punct("-")
+        local idusing "idu"
       }
 
       /* store the original idusing */
@@ -1026,7 +1026,12 @@ qui {
   prog def insert_manual_matches 
   {
   
-    syntax, manual_file(string) idmaster(string) idusing(string)
+    syntax, manual_file(string) idmaster(string) idusing(string) [nopreserve]
+
+    /* preserve the initial data in case the program crashes, unless nopreserve is specified */
+    if "`preserve'" == "" {
+      preserve
+     }
     
     quietly {
       /* ensure the idmaster variable has the _master suffix */
