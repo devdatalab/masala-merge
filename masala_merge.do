@@ -19,10 +19,12 @@ qui {
   varlist: the variables defining the within-group match pools
            i.e. "state district" if you are looking to match villages only within districts
   s1: the match variable (must be the same in the master and using datasets)
-  idmaster: unique id for the master dataset
-  idusing: unique id for the using dataset
   
   Optional arguments:
+  idmaster: unique id for the master dataset, created internally as varlist-s1
+            if not specified, in which case data must be unique on varlist-s1.
+  idmaster: unique id for the using dataset, created internally as varlist-s1
+            if not specified, in which case data must be unique on varlist-s1.
   listvars: any variables you want retained to help identify manual matches
   manual_file: the full filepath for the csv that contains manual matches
   csvsort: the variable on which you want to sort the csv of unmatched observations
@@ -67,8 +69,9 @@ qui {
   cap prog drop masala_merge
   prog def masala_merge
   {
-    syntax [varlist] using/, S1(string) idmaster(string) idusing(string) ///
-                             [LISTvars(varlist) MANUAL_file(string) CSVsort(string) METHOD(string) FUZziness(real 1.0) ///
+    syntax [varlist] using/, S1(string)  ///
+                             [idmaster(string) idusing(string) ///
+                              LISTvars(varlist) MANUAL_file(string) CSVsort(string) METHOD(string) FUZziness(real 1.0) ///
                               MINSCORE(real 0.0)  MINBIGRAM(real 0.0) ///
                               OUTfile(string) KEEPUSING(passthru) nopreserve nonameclean] 
     
@@ -134,7 +137,13 @@ qui {
         gen _`s1' = `s1'
       }
       label var _`s1' "`s1', used in merge"
-      
+
+      /* create an idmaster if it is missing */
+      if "`idmaster'" == "" {
+        egen idmaster = concat(`_varlist' `s1')
+        local idmaster "idmaster"
+      }
+
       /* store the original idmaster */
       local original_idmaster `idmaster'
       
@@ -197,7 +206,13 @@ qui {
           noi di as error "Either clean `s1' before running masala_merge, or run masala_merge specifying nonameclean."
           exit 9
       }
-      
+
+      /* create an idmaster if it is missing */
+      if "`idusing'" == "" {
+        egen idusing = concat(`_varlist' `s1')
+        local idusing "idusing"
+      }
+
       /* store the original idusing */
       local original_idusing `idusing'
       
