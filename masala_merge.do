@@ -323,14 +323,26 @@ qui {
         
         /* run lev_merge */
         lev_merge `_varlist' using `using_working', s(_`s1') outfile(`outfile') fuzziness(`fuzziness')
+
+        /* check to see if the variable lev_dist exists, if it does not then no matches were found */
+        cap confirm var lev_dist
         
-        /* rename variables to be levenshtein and master-specific */
-        ren lev_dist _lev_dist
-        ren `idusing' `idusing'_lev
-        ren _`s1' _`s1'_master
+        /* if there are matches, then rename variables */
+        if _rc == 0 {
+
+          /* rename variables to be levenshtein and master-specific */
+          ren lev_dist _lev_dist
+          ren `idusing' `idusing'_lev
+          ren _`s1' _`s1'_master
         
-        /* keep only the levenshtein matches */
-        keep if _masala_merge == 3
+          /* keep only the levenshtein matches */
+          keep if _masala_merge == 3
+        }
+
+        /* if there is no lev_dist, clear the output because there are no matches */
+        else {
+          clear
+        }
   
         /* check to see if there were any matches made */
         count
