@@ -369,7 +369,7 @@ qui {
         
         /* reload master dataset */
         use `master_working', clear
-        save $tmp/debug_master, replace
+
         /* call reclink */
         noi reclink `_varlist' _`s1' using `using_working', idm(_rl_idm) idu(_rl_idu) gen(_reclink_dist_raw) required(`_varlist') minscore(`minscore') minbigram(`minbigram')
   
@@ -614,13 +614,22 @@ qui {
    
         /* keep only the variables we're interested in */
         keep `_varlist' _`s1'_master `listvars' _`s1'_using `idusing' `idmaster' _group_name
-  
+        save $tmp/debug, replace
+        
         /* drop _group_names that have only idusing or idmaster (meaning there are no possible matches) */
         foreach v in master using {
           gen tmp = !mi(_`s1'_`v')
-          egen _has_`v'  = max(tmp), by(_group_name)
-          keep if _has_`v' == 1
-          drop _has_`v' tmp
+
+          /* check if there are some observations that are not missing the matched variabel */
+          qui sum tmp
+
+          /* only proceed if there are some */
+          if `r(N)' != 0 {
+            egen _has_`v'  = max(tmp), by(_group_name)
+            keep if _has_`v' == 1
+            drop _has_`v'
+          }
+          drop tmp
         }
   
         /* create a local variable to be the match id column */
