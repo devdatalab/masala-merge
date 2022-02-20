@@ -1,0 +1,8 @@
+# Mac specific file
+.DS_Store
+
+# Vscode config
+.vscode/
+
+# Ignore pycache
+__pycache__/
