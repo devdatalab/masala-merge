@@ -5,7 +5,18 @@ import os
 
 #!/usr/bin/python
 # implementation of levenshtein for matching indian names
-''' Calculates the Levenshtein distance of 2 strings'''
+''' Calculates the Levenshtein distance of 2 strings
+Requires python >= 3.0
+
+Uses the __name__ == "__main__" check to allow the script to be invoked in the CLI as well as imported into another python script. 
+The primary purpose of using this check is to ensure that the code within the if __name__ == "__main__" block 
+is only executed when it is invoked as a script from the CLI and not when it is imported into another python script.
+For a detailed read see: https://docs.python.org/3/library/__main__.html#idiomatic-usage
+
+When importing the recommended function to import is the levenshtein() function, which takes 3 parameters:
+    str1, str2: Strings to compute levenshtein distance between
+    distance: (defaults to 1000) upper bound of distance to return (useful to restrict range of values returned)
+'''
 
 import csv
 from optparse import OptionParser
