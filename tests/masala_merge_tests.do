@@ -1,5 +1,4 @@
 global testdir $tests/masala_merge
-do ~/iecmerge/include
 
 /**********************************************************************/
 /* program verify_merge: Confirm a merge returned plausible results   */

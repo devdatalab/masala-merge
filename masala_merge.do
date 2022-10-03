@@ -1983,7 +1983,7 @@ qui {
           exit 123
         }
         
-        /* insheet external csv from ~/iecmerge/pc[]/place_synonyms/  */
+        /* load the synonym file csv */
         preserve
   
         /* read the synfile by using import delimited with ufs-8 encoding */
@@ -2116,7 +2116,10 @@ qui {
       gen `generate' = `varname'
       local name = "`generate'"
     }
-    
+
+    /* if no key specified, use the varname given as the key */
+    if mi("`keys'") local keys `varname'
+      
     qui {
       
       /* verify '__replacements' variable is not in use in order to make replacements */
