@@ -5,7 +5,18 @@ import os
 
 #!/usr/bin/python
 # implementation of levenshtein for matching indian names
-''' Calculates the Levenshtein distance of 2 strings'''
+''' Calculates the Levenshtein distance of 2 strings
+Requires python >= 3.0
+
+Uses the __name__ == "__main__" check to allow the script to be invoked in the CLI as well as imported into another python script. 
+The primary purpose of using this check is to ensure that the code within the if __name__ == "__main__" block 
+is only executed when it is invoked as a script from the CLI and not when it is imported into another python script.
+For a detailed read see: https://docs.python.org/3/library/__main__.html#idiomatic-usage
+
+When importing the recommended function to import is the levenshtein() function, which takes 3 parameters:
+    str1, str2: Strings to compute levenshtein distance between
+    distance: (defaults to 1000) upper bound of distance to return (useful to restrict range of values returned)
+'''
 
 import csv
 from optparse import OptionParser
@@ -176,7 +187,8 @@ def update_matrix(matrix, row, col, value):
     if matrix[row][col] > value: matrix[row][col] = value
 
 # internet levensthein
-def levenshtein(str1, str2):
+# Added distance as optional parameter to avoid breaking function when imported
+def levenshtein(str1, str2, distance = 1000):
 
     # if one string is empty, return the length of the other string
     if not str1.strip(): return len(str2)
@@ -197,7 +209,7 @@ def levenshtein(str1, str2):
     for c2 in range(0,l2):
 
         # store minimum distance in this row
-        min_dist = options.distance
+        min_dist = distance
 
         # loop over each column
         for c1 in range(0,l1):
@@ -262,7 +274,7 @@ def levenshtein(str1, str2):
                 update_matrix(matrix, c2+1, c1+2, matrix[c2][c1] + cost_double_letter)
 
         # if the lowest distance is too large, exit
-        if min_dist >= options.distance: return options.distance
+        if min_dist >= distance: return distance
 
     return matrix[l2][l1]
 
@@ -313,7 +325,7 @@ def levenshtein(str1, str2):
 
 #calculates additional cost of comparison between two string.
 #returns additional cost
-def digit_compare(string1, string2):
+def digit_compare(string1, string2, distance):
 
     first_digits = "" #empty string for digits found in first
     second_digits = "" #empty string for digits found in second
@@ -331,7 +343,7 @@ def digit_compare(string1, string2):
             second_digits += i
 
     # run levenshtein again on just the digit strings
-    digit_penalty = digit_cost * levenshtein(first_digits, second_digits)
+    digit_penalty = digit_cost * levenshtein(first_digits, second_digits, distance)
 
     # return digit penalty
     return digit_penalty
@@ -392,14 +404,14 @@ def two_file_match(options):
             for word2 in dict2[group_id]:
 
                 # calculate lev distance
-                lev_dist = levenshtein(word1.strip().upper(), word2.strip().upper())
+                lev_dist = levenshtein(word1.strip().upper(), word2.strip().upper(), options.distance)
 
                 # double cost of first letter mismatch
                 if word1[0] != word2[0]:
-                    lev_dist += levenshtein(word1[0].upper(), word2[0].upper())
+                    lev_dist += levenshtein(word1[0].upper(), word2[0].upper(), options.distance)
 
                 # raise cost for digit substitutions
-                lev_dist += digit_compare(word1, word2)
+                lev_dist += digit_compare(word1, word2, options.distance)
 
                 # if sorted flag, repeat with sorted words
                 if options.sorted:
@@ -410,10 +422,10 @@ def two_file_match(options):
                     if sorted1 != word1 or sorted2 != word2:
 
                         # now repeat what we did above
-                        sorted_lev_dist = levenshtein(sorted1.strip().upper(), sorted2.strip().upper())
+                        sorted_lev_dist = levenshtein(sorted1.strip().upper(), sorted2.strip().upper(), options.distance)
                         if sorted1[0] != sorted2[0]:
-                            sorted_lev_dist += levenshtein(sorted1[0].upper(), sorted2[0].upper())
-                        sorted_lev_dist += digit_compare(sorted1, sorted2)
+                            sorted_lev_dist += levenshtein(sorted1[0].upper(), sorted2[0].upper(), options.distance)
+                        sorted_lev_dist += digit_compare(sorted1, sorted2, options.distance)
 
                         lev_dist = min(sorted_lev_dist, lev_dist)
 
@@ -444,7 +456,7 @@ def lev_calc(options):
 
     for row in reader:
         group = row[0]
-        lev_dist = levenshtein(row[1].strip().upper(), row[2].strip().upper())
+        lev_dist = levenshtein(row[1].strip().upper(), row[2].strip().upper(), options.distance)
         output_list.append([group, row[1], row[2], str(lev_dist)])
 
     # open output file
@@ -464,13 +476,13 @@ def lev_calc(options):
 ##########
 # MAIN  ##
 ##########
+if __name__ == "__main__":
+    options = parse_options()
 
-options = parse_options()
+    # run two file match if two files submitted
+    if options.file2:
+        two_file_match(options)
 
-# run two file match if two files submitted
-if options.file2:
-    two_file_match(options)
-
-else:
-    options.distance = 1000
-    lev_calc(options)
+    else:
+        options.distance = 1000
+        lev_calc(options)
