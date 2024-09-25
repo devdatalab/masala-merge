@@ -1160,6 +1160,37 @@ qui {
   }
   end
   /* *********** END program insert_manual_matches  ***************************************** */
+
+/**********************************************************************************/
+/* program export_ambiguous_matches : Export a list of master entries that weren't matched
+                                      because there were too many equally good matches. */
+/***********************************************************************************/
+cap prog drop export_ambiguous_matches
+prog def export_ambiguous_matches, rclass
+
+    syntax varlist
+    
+  // create a temporary file location with a 5-digit nonce
+  local nonce = round(runiform() * 90000) + 10000
+local tempfile = $tmp/ambiguous_`nonce'
+
+
+/* count the number of rejected ambiguous matches */
+    count if ambiguous_match != 0 & !mi(ambiguous_match)
+    return local ambiguous_count `r(N)'
+    
+/* return if there aren't any */
+    if `r(N)' == 0 {
+      return local ambiguous_tempfile ""
+      return
+      }
+
+/* save ambiguous matches to an export file */
+savesome `varlist' using `tempfile' if ambiguous_match == 1, replace
+    return local ambiguous_tempfile `tempfile'
+    
+end
+/* *********** END program export_ambiguous_matches ***************************************** */
     
   /**********************************************************************************/
   /* program lev_merge : Fuzzy match using masalafied levenshtein                */
@@ -1385,7 +1416,13 @@ qui {
       /* 3. apply best empirical safety margin rule */
       replace keep_master = 0 if (master_dist_second - master_dist_best) < (0.4 + 0.25 * lev_dist)
       replace keep_using = 0 if (using_dist_second - using_dist_best) < (0.4 + 0.25 * lev_dist)
-    
+      gen ambiguous_match = ((master_dist_second - master_dist_best) < (0.4 + 0.25 * lev_dist)) | ((using_dist_second - using_dist_best) < (0.4 + 0.25 * lev_dist))
+        
+      /* export dataset with list of ambiguous potential matches */
+      export_ambiguous_match_list `varlist' `s1'_master `s1'_using lev_dist keep_using master_* using_*
+      global ambiguous_tempfile `r(ambiguous_tempfile)'
+      global ambiguous_count `r(ambiguous_count)'
+        
       /* save over output file */
       order `varlist' `s1'_master `s1'_using lev_dist keep_master keep_using master_* using_*
       save `outfile', replace
@@ -1408,6 +1445,9 @@ qui {
     di "Masala-Levensthein merge complete."
     di " Original master file was saved here:   `master'"
     di " Complete set of fuzzy matches is here: `outfile'"
+    if !mi("$ambiguous_tempfile") {
+      di " Ambiguous rows left unmatched are here: $ambiguous_tempfile"
+    }
   }
   end
   /* *********** END program lev_merge ***************************************** */
@@ -1686,6 +1726,12 @@ qui {
     if `r(N)' > 1 {
       disp_nice "These are high cost matches, with no good alternatives. keep_master is 1."
       list `varlist' `s1'* lev_dist if keep_master == 1 & lev_dist > 1
+    }
+
+    /* show ambiguous matches if there are any */
+    if !mi("$ambiguous_tempfile") {
+      di "Some valid matches were left empty because there were too many options."
+      di "Explore these matches here ($ambiguous_count rows): $ambiguous_tempfile"
     }
   
     /* run lev_process, and then show the unmatched places */
