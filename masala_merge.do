@@ -29,7 +29,7 @@ qui {
   manual_file: the full filepath for the csv that contains manual matches
   csvsort: the variable on which you want to sort the csv of unmatched observations
   method: which methods to use in the merge; options are: levonly, rlonly (running
-          lev_merge or reclink only). unspecified runs both
+          lev_merge or reclink only), and both. The default is levonly.
   nopreserve: if specified, will not preserve the original data (use for debugging)
   fuzziness: how much uncertainty to allow in the matches, used directly in lev_merge
              and used to generate thresholds for reclink (minscore and minbigram)
@@ -103,7 +103,13 @@ qui {
       if `minbigram' == 0.0 {
         local minbigram = 0.85 + (1 - `fuzziness') * 0.03
       }  
-  
+
+      /* set the default value for method */
+      if "`method'" == "" {
+        local method levonly
+      }
+        
+        
       /* if keepusing is specified, add the required s1 variable that must also be kept by the merge */
       if !mi("`keepusing'") {
         local keepusing = subinstr("`keepusing'", ")", " `s1'_using _`s1'_using `_varlist' `varlist' _rl_idu)", .)
@@ -411,7 +417,7 @@ qui {
           save `rl_matches'
         }
   
-        /* if there were no reclink matches made, inlclude levonly in the method to create a dummy rlmatches file */
+        /* if there were no reclink matches made, include levonly in the method to create a dummy rlmatches file */
         else {
           local method "`method'levonly"
         }
