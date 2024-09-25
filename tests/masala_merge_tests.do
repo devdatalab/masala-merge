@@ -24,7 +24,7 @@ end
 /* standard masala-merge, string identifiers */
 /*******************************************/
 use $testdir/adr_candidates_test, clear
-masala_merge ac_id year using $testdir/tr_candidates_test, s1(cand_name) idmaster(_adr_id_string) idusing(_tr_id_string)
+masala_merge ac_id year using $testdir/tr_candidates_test, s1(cand_name) idmaster(_adr_id_string) idusing(_tr_id_string) method(both)
 
 /* run basic checks */
 verify_merge
@@ -93,7 +93,7 @@ assert !inlist(match_source, 2, 4)
 
 /* run basic test with higher fuzziness */
 use $testdir/adr_candidates_test, clear
-masala_merge ac_id year using $testdir/tr_candidates_test, s1(cand_name) idmaster(_adr_id_string) idusing(_tr_id_string) fuzziness(4)
+masala_merge ac_id year using $testdir/tr_candidates_test, s1(cand_name) idmaster(_adr_id_string) idusing(_tr_id_string) fuzziness(4) method(both)
 verify_merge
 
 /* we should get more matches */
@@ -106,7 +106,7 @@ assert `r(N)' > $n_main_match
 
 /* listvars, unsorted */
 use $testdir/adr_candidates_test, clear
-masala_merge ac_id year using $testdir/tr_candidates_test, s1(cand_name) idmaster(_adr_id_string) idusing(_tr_id_string) listvars(age)
+masala_merge ac_id year using $testdir/tr_candidates_test, s1(cand_name) idmaster(_adr_id_string) idusing(_tr_id_string) listvars(age) method(both)
 verify_merge
 
 /* assert that the output csv file contains a head */
@@ -114,7 +114,7 @@ verify_merge
 
 /* listvars, sorted */
 use $testdir/adr_candidates_test, clear
-masala_merge ac_id year using $testdir/tr_candidates_test, s1(cand_name) idmaster(_adr_id_string) idusing(_tr_id_string) listvars(age) csvsort(age)
+masala_merge ac_id year using $testdir/tr_candidates_test, s1(cand_name) idmaster(_adr_id_string) idusing(_tr_id_string) listvars(age) csvsort(age) method(both)
 verify_merge
 
 /*****************************************************************************/
@@ -123,24 +123,24 @@ verify_merge
 
 /* nopreserve */
 use $testdir/adr_candidates_test, clear
-masala_merge ac_id year using $testdir/tr_candidates_test, s1(cand_name) idmaster(_adr_id_string) idusing(_tr_id_string)  nopreserve
+masala_merge ac_id year using $testdir/tr_candidates_test, s1(cand_name) idmaster(_adr_id_string) idusing(_tr_id_string)  nopreserve  method(both)
 verify_merge
 
 /* minscore */
 use $testdir/adr_candidates_test, clear
-masala_merge ac_id year using $testdir/tr_candidates_test, s1(cand_name) idmaster(_adr_id_string) idusing(_tr_id_string) minscore(.7)
+masala_merge ac_id year using $testdir/tr_candidates_test, s1(cand_name) idmaster(_adr_id_string) idusing(_tr_id_string) minscore(.7)  method(both)
 verify_merge
 
 /* minbigram */
 use $testdir/adr_candidates_test, clear
-masala_merge ac_id year using $testdir/tr_candidates_test, s1(cand_name) idmaster(_adr_id_string) idusing(_tr_id_string) minbigram(.7)
+masala_merge ac_id year using $testdir/tr_candidates_test, s1(cand_name) idmaster(_adr_id_string) idusing(_tr_id_string) minbigram(.7)  method(both)
 verify_merge
 
 /*************/
 /* keepusing */
 /*************/
 use $testdir/adr_candidates_test, clear
-masala_merge ac_id year using $testdir/tr_candidates_test, s1(cand_name) idmaster(_adr_id_string) idusing(_tr_id_string) keepusing(position)
+masala_merge ac_id year using $testdir/tr_candidates_test, s1(cand_name) idmaster(_adr_id_string) idusing(_tr_id_string) keepusing(position)  method(both)
 verify_merge
 
 /* position variable should exist, sex should not */
@@ -148,6 +148,9 @@ cap confirm variable position
 assert _rc == 0
 cap confirm variable sex
 assert _rc == 111
+
+
+
 
 
 /***************************/
@@ -192,7 +195,7 @@ foreach i in master using {
 use `no_matches_master', clear
 
 /* execute masala_merge with the no-match using side */
-masala_merge ac_id year using `no_matches_using', s1(cand_name) idmaster(_adr_id_string) idusing(_tr_id_string) 
+masala_merge ac_id year using `no_matches_using', s1(cand_name) idmaster(_adr_id_string) idusing(_tr_id_string)   method(both)
 
 /* assert that there are no matches */
 assert _merge != 3
