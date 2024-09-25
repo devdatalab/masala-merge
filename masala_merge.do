@@ -745,13 +745,18 @@ qui {
 
       noi di " The original master file was saved here:   `master'"
       noi di " The complete set of fuzzy matches is here: `outfile'"
-      if !mi("$ambiguous_tempfile") {
-        noi di " Ambiguous rows left unmatched are here ($ambiguous_count): $ambiguous_tempfile.dta"
+        if !mi("$ambiguous_tempfile") {
+        noi disp_nice "WARNING: You have ambiguous matches that were left unmatched!"
+        noi di " Some rows were left unmatched, because there are multiple good matches."
+        noi di " Review these rows here ($ambiguous_count): $ambiguous_tempfile.dta"
+          noi di " Be careful, these are left unmatched, but probably have a good match on the using side."
+          noi di "----------------------------------------------------------------------------------------"
       }
 
         
       /* if there were unmatched observations output, display information about adding manual matches */
       if `unmatched_count' != 0 {
+        noi disp_nice "How to improve this match further: "
         noi di "Unmatched observations were output here: `unmatched_fn'"
         noi di ""
         noi di "To add more manual matches from the unmatched observations:"
@@ -1191,7 +1196,6 @@ prog def export_ambiguous_matches
   // create a temporary file location with a 5-digit nonce
   local nonce = round(runiform() * 90000) + 10000
   local tempfile $tmp/ambiguous_`nonce'
-
 
   /* count the number of rejected ambiguous matches */
   count if ambiguous_match != 0 & !mi(ambiguous_match)
