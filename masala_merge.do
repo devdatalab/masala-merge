@@ -569,14 +569,21 @@ qui {
       replace match_source = 6 if _m1 == 1
       replace match_source = 7 if _m2 == 2
       drop _m1 _m2
-  
+
       if mi("`keepusing'") {
         /* identify the overlapping variables between master and using */
         local both : list mastervars & usingvars
         local both : list sort both
-  
-        noi disp_nice "WARNING: The following variables appear in both datasets. The master value is selected."
-        noi di "shared variables: `both'"
+        /* strip group names, which obv appear in both */
+        local both : di subinstr("`both'", "_group_name", "", .)
+        foreach v in `varlist' {
+          local both : di subinstr("`both'", "_`v'", "", .)
+        }
+           
+        if !mi(strtrim("`both'")) {
+          noi disp_nice "WARNING: The following variables appear in both datasets. The master value is selected."
+          noi di "shared variables: `both'"
+        }
       }
       
       /* save the merge results using this merge's unqiue 6-digit identifier */
@@ -735,7 +742,14 @@ qui {
       noi tab match_source
       noi di ""
       noi di "Final returned merge data is also stored at :  $tmp/merge_results_`nonce'"
-      
+
+      noi di " The original master file was saved here:   `master'"
+      noi di " The complete set of fuzzy matches is here: `outfile'"
+      if !mi("$ambiguous_tempfile") {
+        noi di " Ambiguous rows left unmatched are here ($ambiguous_count): $ambiguous_tempfile.dta"
+      }
+
+        
       /* if there were unmatched observations output, display information about adding manual matches */
       if `unmatched_count' != 0 {
         noi di "Unmatched observations were output here: `unmatched_fn'"
@@ -1172,28 +1186,26 @@ qui {
                                       because there were too many equally good matches. */
 /***********************************************************************************/
 cap prog drop export_ambiguous_matches
-prog def export_ambiguous_matches, rclass
-
-    syntax varlist
+prog def export_ambiguous_matches
     
   // create a temporary file location with a 5-digit nonce
   local nonce = round(runiform() * 90000) + 10000
-local tempfile = $tmp/ambiguous_`nonce'
+  local tempfile $tmp/ambiguous_`nonce'
 
 
-/* count the number of rejected ambiguous matches */
-    count if ambiguous_match != 0 & !mi(ambiguous_match)
-    return local ambiguous_count `r(N)'
+  /* count the number of rejected ambiguous matches */
+  count if ambiguous_match != 0 & !mi(ambiguous_match)
+  global ambiguous_count `r(N)'
     
-/* return if there aren't any */
-    if `r(N)' == 0 {
-      return local ambiguous_tempfile ""
-      return
-      }
+  /* return if there aren't any */
+  if `r(N)' == 0 {
+      global ambiguous_tempfile ""
+      exit
+  }
 
-/* save ambiguous matches to an export file */
-savesome `varlist' using `tempfile' if ambiguous_match == 1, replace
-    return local ambiguous_tempfile `tempfile'
+  /* save ambiguous matches to an export file */
+  savesome `varlist' using `tempfile' if ambiguous_match == 1, replace
+  global ambiguous_tempfile `tempfile'
     
 end
 /* *********** END program export_ambiguous_matches ***************************************** */
@@ -1425,9 +1437,7 @@ end
       gen ambiguous_match = ((master_dist_second - master_dist_best) < (0.4 + 0.25 * lev_dist)) | ((using_dist_second - using_dist_best) < (0.4 + 0.25 * lev_dist))
         
       /* export dataset with list of ambiguous potential matches */
-      export_ambiguous_match_list `varlist' `s1'_master `s1'_using lev_dist keep_using master_* using_*
-      global ambiguous_tempfile `r(ambiguous_tempfile)'
-      global ambiguous_count `r(ambiguous_count)'
+        export_ambiguous_matches `varlist' `s1'_master `s1'_using lev_dist keep_using master_* using_*
         
       /* save over output file */
       order `varlist' `s1'_master `s1'_using lev_dist keep_master keep_using master_* using_*
@@ -1446,13 +1456,6 @@ end
     /* if quietly is specified, go directly to lev_process */
     else {
       lev_process `varlist', s1(`s1') master(`master') using(`using')
-    }
-    
-    di "Masala-Levensthein merge complete."
-    di " Original master file was saved here:   `master'"
-    di " Complete set of fuzzy matches is here: `outfile'"
-    if !mi("$ambiguous_tempfile") {
-      di " Ambiguous rows left unmatched are here: $ambiguous_tempfile"
     }
   }
   end
@@ -1734,12 +1737,6 @@ end
       list `varlist' `s1'* lev_dist if keep_master == 1 & lev_dist > 1
     }
 
-    /* show ambiguous matches if there are any */
-    if !mi("$ambiguous_tempfile") {
-      di "Some valid matches were left empty because there were too many options."
-      di "Explore these matches here ($ambiguous_count rows): $ambiguous_tempfile"
-    }
-  
     /* run lev_process, and then show the unmatched places */
     lev_process `varlist', s1(`s1') master(`master') using(`using') `keepusing'
   

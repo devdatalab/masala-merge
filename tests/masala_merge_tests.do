@@ -151,7 +151,10 @@ assert _rc == 111
 
 
 
-
+/***************************************/
+/* Test dealing with ambiguous matches */
+/***************************************/
+// do test_ambiguous_matches.do
 
 /***************************/
 /*  No matches in the data */
