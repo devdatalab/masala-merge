@@ -1203,6 +1203,8 @@ qui {
 /***********************************************************************************/
 cap prog drop export_ambiguous_matches
 prog def export_ambiguous_matches
+
+  syntax varlist
     
   // create a temporary file location with a 5-digit nonce
   local nonce = round(runiform() * 90000) + 10000
@@ -1219,7 +1221,7 @@ prog def export_ambiguous_matches
   }
 
   /* save ambiguous matches to an export file */
-  savesome `varlist' using `tempfile' if ambiguous_match == 1, replace
+  savesome `varlist' lev_dist g master_dist_best master_dist_second keep_master length using `tempfile' if ambiguous_match == 1, replace
   global ambiguous_tempfile `tempfile'
     
 end
@@ -1455,7 +1457,7 @@ end
       drop any_match
         
       /* export a dataset with list of ambiguous potential matches */
-      export_ambiguous_matches
+      export_ambiguous_matches `s1'_master `s1'_using 
 
       /* Default behavior is to reject matches where there are two very similar targets.
          The default is that the target/using dataset is canonical, so if we can't match one target
