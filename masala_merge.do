@@ -73,13 +73,19 @@ qui {
                              [idmaster(string) idusing(string) ///
                               LISTvars(varlist) MANUAL_file(string) CSVsort(string) METHOD(string) FUZziness(real 1.0) ///
                               MINSCORE(real 0.0)  MINBIGRAM(real 0.0) ///
-                              OUTfile(string) KEEPUSING(passthru) nopreserve nonameclean] 
+          OUTfile(string) KEEPUSING(passthru) nopreserve nonameclean KEEPAMBiguous ///
+        ] 
     
     quietly {
-  
+        
       /* preserve the initial data in case the program crashes, unless nopreserve is specified */
       if "`preserve'" == "" {
         preserve
+        }
+
+      /* prep keep-ambiguous flag for passthrough to lev_merge */
+      if !mi("`keepambiguous'") {
+        local keepambiguous_pass "keepambiguous"
       }
 
       /* create a random 5-6 digit number to make file names for this merge unique */
@@ -328,7 +334,7 @@ qui {
         use `master_working', clear
         
         /* run lev_merge */
-        lev_merge `_varlist' using `using_working', s(_`s1') outfile(`outfile') fuzziness(`fuzziness')
+        lev_merge `_varlist' using `using_working', s(_`s1') outfile(`outfile') fuzziness(`fuzziness') `keepambiguous_pass'
 
         /* check to see if the variable lev_dist exists, if it does not then no matches were found */
         cap confirm var lev_dist
@@ -746,13 +752,18 @@ qui {
       noi di " The original master file was saved here:   `master'"
       noi di " The complete set of fuzzy matches is here: `outfile'"
         if !mi("$ambiguous_tempfile") {
-        noi disp_nice "WARNING: You have ambiguous matches that were left unmatched!"
-        noi di " Some rows were left unmatched, because there are multiple good matches."
-        noi di " Review these rows here ($ambiguous_count): $ambiguous_tempfile.dta"
-          noi di " Be careful, these are left unmatched, but probably have a good match on the using side."
-          noi di "----------------------------------------------------------------------------------------"
+          noi disp_nice "WARNING: Some master entries had multiple good fits on the using side!"
+          noi di " You can review these rows here ($ambiguous_count): $ambiguous_tempfile.dta"
+          if !mi("`keepambiguous'") {
+            noi di " Masala_merge only kept the best match in each case (and picked randomly if two were equally good)."
+          }
+          else {
+            noi di " **All of these were left unmatched.** This means that some unmatched master rows do"
+            noi di "   in fact have good matches on the using side."
+            noi di " If you want the best one, use the parameter 'keepambiguous'."
+          }
+        noi di "----------------------------------------------------------------------------------------"
       }
-
         
       /* if there were unmatched observations output, display information about adding manual matches */
       if `unmatched_count' != 0 {
@@ -1198,7 +1209,7 @@ prog def export_ambiguous_matches
   local tempfile $tmp/ambiguous_`nonce'
 
   /* count the number of rejected ambiguous matches */
-  count if ambiguous_match != 0 & !mi(ambiguous_match)
+  count if ambiguous_match == 1
   global ambiguous_count `r(N)'
     
   /* return if there aren't any */
@@ -1230,7 +1241,7 @@ end
   cap prog drop lev_merge
   prog def lev_merge
   {
-    syntax [varlist] using/, S1(string) [OUTfile(string) FUZZINESS(real 1.0) quietly KEEPUSING(passthru) SORTWORDS] 
+    syntax [varlist] using/, S1(string) [OUTfile(string) FUZZINESS(real 1.0) quietly KEEPUSING(passthru) SORTWORDS KEEPAMBiguous] 
   
     /* drop lev_dist if it already exists */
     cap drop lev_dist
@@ -1408,14 +1419,13 @@ end
         drop tmp
         
         drop `v'_dist_rank
-      }
-      
-      drop g _m
+        }
+        
+      drop _m
     
       /* apply optimal matching rule (based on 1991-2001 pop census confirmed village matches in calibrate_fuzzy.do) */
       /* initialize */
       gen keep_master = 1
-      gen keep_using = 1
     
       /* get mean length of matched string */
       gen length = floor(0.5 * (length(`s1'_master) + length(`s1'_using)))
@@ -1428,23 +1438,51 @@ end
       replace keep_master = 0 if lev_dist > (1.8 * `fuzziness') & inrange(length, 15, 17)
       replace keep_master = 0 if lev_dist > (2.1 * `fuzziness')
       
-      /* copy these thresholds to keep_using */
-      replace keep_using = 0 if keep_master == 0
-    
       /* 2. never use a match that is not the best match */
       replace keep_master = 0 if (lev_dist > master_dist_best) & !mi(lev_dist)
-      replace keep_using = 0 if (lev_dist > using_dist_best) & !mi(lev_dist)
       
       /* 3. apply best empirical safety margin rule */
-      replace keep_master = 0 if (master_dist_second - master_dist_best) < (0.4 + 0.25 * lev_dist)
-      replace keep_using = 0 if (using_dist_second - using_dist_best) < (0.4 + 0.25 * lev_dist)
-      gen ambiguous_match = ((master_dist_second - master_dist_best) < (0.4 + 0.25 * lev_dist)) | ((using_dist_second - using_dist_best) < (0.4 + 0.25 * lev_dist))
+      
         
-      /* export dataset with list of ambiguous potential matches */
-        export_ambiguous_matches `varlist' `s1'_master `s1'_using lev_dist keep_using master_* using_*
+      /* record if we have a match at all */
+      bys g `s1'_master: egen any_match = max(keep_master)
+        
+      /* Identify master rows where there is more than one plausible target match */
+      /* "any" identifies all the rows where the second best is close to the first.
+        ambiguous_match identifies the specific candidate rows. */
+      gen any_ambiguous_match = ((master_dist_second - master_dist_best) < (0.3 + 0.05 * length)) & any_match == 1
+      gen ambiguous_match = 1 if ((lev_dist - master_dist_best) < (0.3 + 0.05 * length)) & (any_ambiguous_match == 1) & (any_match == 1)
+      drop any_match
+        
+      /* export a dataset with list of ambiguous potential matches */
+      export_ambiguous_matches
+
+      /* Default behavior is to reject matches where there are two very similar targets.
+         The default is that the target/using dataset is canonical, so if we can't match one target
+        with certainty, we prefer to match nothing. */
+      if mi("`keepambiguous'") {
+
+        /* discard ambiguous matches */
+        replace keep_master = 0 if any_ambiguous_match == 1
+        
+      }
+      
+      /* If we allow ambiguous matches, we select one randomly from the exact matches */
+      else {
+
+        /* keep only one version of each (group matchstring) set */
+        cap drop __tag
+        egen __tag = tag(g `s1'_master) if keep_master == 1
+        replace __tag = . if keep_master == 0
+        drop if __tag == 0 & keep_master == 1
+        drop __tag
+      }
+
+      /* drop group var g, which is no longer used */
+      drop g
         
       /* save over output file */
-      order `varlist' `s1'_master `s1'_using lev_dist keep_master keep_using master_* using_*
+      order `varlist' `s1'_master `s1'_using lev_dist keep_master master_* using_*
       save `outfile', replace
     }
     restore
@@ -2234,3 +2272,4 @@ end
   /* *********** END program str_fix ***************************************** */
   
 }
+ 
