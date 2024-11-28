@@ -2272,6 +2272,18 @@ end
   }
   end
   /* *********** END program str_fix ***************************************** */
-  
+
+  /********************************************************************************************/
+  /* program is_unique : Asserts that a variable combination uniquely identifies observations */
+  /********************************************************************************************/
+  cap prog drop is_unique
+  prog def is_unique
+  {
+    syntax varlist
+    bys `varlist': assert _N == 1
+  }
+  end
+  /* *********** END program is_unique ***************************************** */
+
 }
  
