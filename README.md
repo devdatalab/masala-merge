@@ -230,3 +230,7 @@ Example:
 1922. |    puducherry      pondicherry       1.35 |
       +-------------------------------------------+
 ```
+
+## R script
+
+`masala_merge.R` is an R script version of `masala_merge.do`. The function takes the master and using dataframes, the columns on which the masala merge is performed, the matching variable, the file path where intermediate results should be saved, `tmp`, and `MASALA_PATH`. It also accepts optional parameters for fuzziness and sortwords.
