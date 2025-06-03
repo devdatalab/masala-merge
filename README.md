@@ -33,7 +33,7 @@ masala_merge state_name using $tmp/target_key, s1(community_name) method(levonly
 
 R:
 ```
-masala_merge(df_master, df_using, c("pc01_state_id", "group"), "surname", outfile = /path/to/output/, tmp = /path/to/tmp/, MASALA_PATH = /path/to/masala/)
+masala_merge(df_master, df_using, c("state_name"), "community_name", outfile = /path/to/output/, fuzziness = 0.5, tmp = /path/to/tmp/, MASALA_PATH = /path/to/masala/)
 ```
 
 ## Parameters
