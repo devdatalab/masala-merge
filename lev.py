@@ -2,6 +2,8 @@ import pdb
 import time
 import io
 import os
+import multiprocessing as mp
+import sys
 
 #!/usr/bin/python
 # implementation of levenshtein for matching indian names
@@ -348,6 +350,56 @@ def digit_compare(string1, string2, distance):
     # return digit penalty
     return digit_penalty
 
+# Multiprocessing function for a pair of groups of words using a Queue for file output
+def process_group(group_id, words1, words2, options, write_queue, group_index, total_groups, start_time):
+    for word1 in words1:
+        for word2 in words2:
+            # calculate lev distance
+            lev_dist = levenshtein(word1.strip().upper(), word2.strip().upper(), options.distance)
+
+            # double cost of first letter mismatch
+            if word1[0] != word2[0]:
+                lev_dist += levenshtein(word1[0].upper(), word2[0].upper(), options.distance)
+
+            # raise cost for digit substitutions
+            lev_dist += digit_compare(word1, word2, options.distance)
+
+            # if sorted flag, repeat with sorted words
+            if options.sorted:
+                sorted1 = sort_words(word1)
+                sorted2 = sort_words(word2)
+
+                # only go to levenshtein if words are different
+                if sorted1 != word1 or sorted2 != word2:
+
+                    # now repeat what we did above
+                    sorted_lev_dist = levenshtein(sorted1.strip().upper(), sorted2.strip().upper(), options.distance)
+                    if sorted1[0] != sorted2[0]:
+                        sorted_lev_dist += levenshtein(sorted1[0].upper(), sorted2[0].upper(), options.distance)
+                    sorted_lev_dist += digit_compare(sorted1, sorted2, options.distance)
+
+                    lev_dist = min(sorted_lev_dist, lev_dist)
+
+            # add a line to outfile with the distance
+            # print('"%s", "%s", %d' % (word1, word2, lev_dist) )
+            if lev_dist < options.distance:
+                write_queue.put('"%s", "%s", "%s", %5.2f\n' % (group_id, word1, word2, lev_dist) )
+
+    finish_time = time.time()
+    time_passed = finish_time - start_time
+    print("%8.2f min: Completed Group %4d/%d" % (time_passed / 60, group_index, total_groups))
+    
+    return True
+
+def writer_process(write_queue, outfile):
+    with open(outfile, 'w') as foutput:
+        while True:
+            line = write_queue.get()
+            if line == "DONE":
+                foutput.flush()
+                break
+            foutput.write(line)
+
 ###############################################################################
 # many-to-many merge on two files, each a list of unique ids and strings
 #              Produces a new file with file1, file2, lev_dist
@@ -364,80 +416,135 @@ def two_file_match(options):
 
     print("Calculating edit distances... ")
 
-    # open output file
+    # Check if file can be opened
     foutput = open(options.outfile, 'w')
     if not foutput:
         print("Could not open output file")
-        die()
-
-    # put some things in place for time estimation
-    start_time = time.time()
-
-    # calculate total number of comparisons to be done
-    total_comps = 0
-    for group_id in sorted(dict1.keys()):
-        if group_id in dict2:
-            total_comps += len(dict1[group_id]) * len(dict2[group_id])
-    finished_comps = 0
-
-    # loop over each group
-    count = len(dict1.keys())
-    i = 0
-
-    for group_id in sorted(dict1.keys()):
-
-        # update counter
-        i += 1
-
-        time_passed = time.time() - start_time
-        time_est = float(time_passed / (finished_comps + 1)) * float((total_comps - finished_comps))
-
-        # verify this group appears in both datasets
-        if group_id not in dict2: continue
-
-        # count the total number of comparisons to be done
-        comps = len(dict1[group_id]) * len(dict2[group_id])
-
-        print("%8.2f min: Group %4d/%d (%6d comparisons, %6.1f minutes remaining)" % (float(time_passed)/60, i, count, comps, float(time_est)/60))
-
-        for word1 in dict1[group_id]:
-            for word2 in dict2[group_id]:
-
-                # calculate lev distance
-                lev_dist = levenshtein(word1.strip().upper(), word2.strip().upper(), options.distance)
-
-                # double cost of first letter mismatch
-                if word1[0] != word2[0]:
-                    lev_dist += levenshtein(word1[0].upper(), word2[0].upper(), options.distance)
-
-                # raise cost for digit substitutions
-                lev_dist += digit_compare(word1, word2, options.distance)
-
-                # if sorted flag, repeat with sorted words
-                if options.sorted:
-                    sorted1 = sort_words(word1)
-                    sorted2 = sort_words(word2)
-
-                    # only go to levenshtein if words are different
-                    if sorted1 != word1 or sorted2 != word2:
-
-                        # now repeat what we did above
-                        sorted_lev_dist = levenshtein(sorted1.strip().upper(), sorted2.strip().upper(), options.distance)
-                        if sorted1[0] != sorted2[0]:
-                            sorted_lev_dist += levenshtein(sorted1[0].upper(), sorted2[0].upper(), options.distance)
-                        sorted_lev_dist += digit_compare(sorted1, sorted2, options.distance)
-
-                        lev_dist = min(sorted_lev_dist, lev_dist)
-
-                # add a line to outfile with the distance
-                # print('"%s", "%s", %d' % (word1, word2, lev_dist) )
-                if lev_dist < options.distance:
-                    foutput.write('"%s", "%s", "%s", %5.2f\n' % (group_id, word1, word2, lev_dist) )
-
-        # record how many comparisons are finished
-        finished_comps += comps
-
+        sys.exit(1)
     foutput.close()
+
+    # Set flag for multiprocessing
+    # Set it to true for now
+    MP_ENABLED = True
+
+    if MP_ENABLED:
+        mp_manager = mp.Manager()
+        write_queue = mp_manager.Queue()
+        
+        # Limit to 16 processes to avoid overloading the system
+        num_processes = min(mp.cpu_count(), 16)
+
+        with mp.Pool(processes=num_processes) as pool:
+            # Start writer process
+            writer = pool.apply_async(writer_process, (write_queue, options.outfile))
+            
+            # loop over each group
+            count = len(dict1.keys())
+            i = 0
+
+            # Store results
+            jobs = []
+            
+            # put some things in place for time estimation
+            start_time = time.time()
+
+            for group_id in sorted(dict1.keys()):
+
+                # update counter
+                i += 1
+
+                # verify this group appears in both datasets
+                if group_id not in dict2: continue
+
+                # Submit the group processing to the pool
+                jobs.append(pool.apply_async(process_group, args=(group_id, dict1[group_id], dict2[group_id], options, write_queue, i, count, start_time)))
+            
+            # Wait for all jobs to finish
+            for job in jobs:
+                job.get()
+            
+            # Signal the writer process to finish
+            write_queue.put("DONE")
+
+            # Wait for the writer process to finish
+            writer.get()
+
+            # Close the pool
+            pool.close()
+            pool.join()
+
+    else:
+        # open output file
+        foutput = open(options.outfile, 'w')
+
+        # put some things in place for time estimation
+        start_time = time.time()
+
+        # calculate total number of comparisons to be done
+        total_comps = 0
+        for group_id in sorted(dict1.keys()):
+            if group_id in dict2:
+                total_comps += len(dict1[group_id]) * len(dict2[group_id])
+        finished_comps = 0
+
+        # loop over each group
+        count = len(dict1.keys())
+        i = 0
+
+        for group_id in sorted(dict1.keys()):
+
+            # update counter
+            i += 1
+
+            time_passed = time.time() - start_time
+            time_est = float(time_passed / (finished_comps + 1)) * float((total_comps - finished_comps))
+
+            # verify this group appears in both datasets
+            if group_id not in dict2: continue
+
+            # count the total number of comparisons to be done
+            comps = len(dict1[group_id]) * len(dict2[group_id])
+
+            print("%8.2f min: Group %4d/%d (%6d comparisons, %6.1f minutes remaining)" % (float(time_passed)/60, i, count, comps, float(time_est)/60))
+
+            for word1 in dict1[group_id]:
+                for word2 in dict2[group_id]:
+
+                    # calculate lev distance
+                    lev_dist = levenshtein(word1.strip().upper(), word2.strip().upper(), options.distance)
+
+                    # double cost of first letter mismatch
+                    if word1[0] != word2[0]:
+                        lev_dist += levenshtein(word1[0].upper(), word2[0].upper(), options.distance)
+
+                    # raise cost for digit substitutions
+                    lev_dist += digit_compare(word1, word2, options.distance)
+
+                    # if sorted flag, repeat with sorted words
+                    if options.sorted:
+                        sorted1 = sort_words(word1)
+                        sorted2 = sort_words(word2)
+
+                        # only go to levenshtein if words are different
+                        if sorted1 != word1 or sorted2 != word2:
+
+                            # now repeat what we did above
+                            sorted_lev_dist = levenshtein(sorted1.strip().upper(), sorted2.strip().upper(), options.distance)
+                            if sorted1[0] != sorted2[0]:
+                                sorted_lev_dist += levenshtein(sorted1[0].upper(), sorted2[0].upper(), options.distance)
+                            sorted_lev_dist += digit_compare(sorted1, sorted2, options.distance)
+
+                            lev_dist = min(sorted_lev_dist, lev_dist)
+
+                    # add a line to outfile with the distance
+                    # print('"%s", "%s", %d' % (word1, word2, lev_dist) )
+                    if lev_dist < options.distance:
+                        foutput.write('"%s", "%s", "%s", %5.2f\n' % (group_id, word1, word2, lev_dist) )
+
+            # record how many comparisons are finished
+            finished_comps += comps
+
+        foutput.close()
 
     # print end timestamp
     print(datetime.now())
