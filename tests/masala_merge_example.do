@@ -23,7 +23,7 @@ ren state lgd_state_name
 ren district lgd_district_name
 
 /* run masala_merge */
-masala_merge lgd_state_name using $masalapath/tests/data/standard_district_names, s1(lgd_district_name) minbigram(0.6) minscore(0.7) outfile($masalapath/tests/data/matched_districts)
+masala_merge lgd_state_name using $masalapath/tests/data/standard_district_names, s1(lgd_district_name) minbigram(0.6) minscore(0.7) outfile($masalapath/tests/data/matched_districts) keepambiguous
 
 /* to make additional manual matches:
   1. open the unmatched observations file

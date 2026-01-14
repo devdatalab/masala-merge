@@ -73,7 +73,7 @@ qui {
                              [idmaster(string) idusing(string) ///
                               LISTvars(varlist) MANUAL_file(string) CSVsort(string) METHOD(string) FUZziness(real 1.0) ///
                               MINSCORE(real 0.0)  MINBIGRAM(real 0.0) ///
-          OUTfile(string) KEEPUSING(passthru) nopreserve nonameclean KEEPAMBiguous ///
+          OUTfile(string) KEEPUSING(passthru) nopreserve nonameclean KEEPAMBiguous AMBIGfile(string) ///
         ] 
     
     quietly {
@@ -334,7 +334,13 @@ qui {
         use `master_working', clear
         
         /* run lev_merge */
-        lev_merge `_varlist' using `using_working', s(_`s1') outfile(`outfile') fuzziness(`fuzziness') `keepambiguous_pass'
+        if mi("`ambigfile'") {
+          lev_merge `_varlist' using `using_working', s(_`s1') outfile(`outfile') fuzziness(`fuzziness') `keepambiguous_pass'
+        } 
+        
+        else {
+          lev_merge `_varlist' using `using_working', s(_`s1') outfile(`outfile') fuzziness(`fuzziness') `keepambiguous_pass' ambigfile(`ambigfile')
+        }
 
         /* check to see if the variable lev_dist exists, if it does not then no matches were found */
         cap confirm var lev_dist
@@ -1204,11 +1210,14 @@ qui {
 cap prog drop export_ambiguous_matches
 prog def export_ambiguous_matches
 
-  syntax varlist
+  syntax varlist, [AMBIGfile(string)]
+
+  if mi("`ambigfile'") {
+    // create a temporary file location with a 5-digit nonce
+    local nonce = round(runiform() * 90000) + 10000
+    local ambigfile $tmp/ambiguous_`nonce'
+  }
     
-  // create a temporary file location with a 5-digit nonce
-  local nonce = round(runiform() * 90000) + 10000
-  local tempfile $tmp/ambiguous_`nonce'
 
   /* count the number of rejected ambiguous matches */
   count if ambiguous_match == 1
@@ -1221,8 +1230,8 @@ prog def export_ambiguous_matches
   }
 
   /* save ambiguous matches to an export file */
-  savesome `varlist' lev_dist g master_dist_best master_dist_second keep_master length using `tempfile' if ambiguous_match == 1, replace
-  global ambiguous_tempfile `tempfile'
+  savesome `varlist' lev_dist g master_dist_best master_dist_second keep_master length using `ambigfile' if ambiguous_match == 1, replace
+  global ambiguous_tempfile `ambigfile'
     
 end
 /* *********** END program export_ambiguous_matches ***************************************** */
@@ -1243,7 +1252,7 @@ end
   cap prog drop lev_merge
   prog def lev_merge
   {
-    syntax [varlist] using/, S1(string) [OUTfile(string) FUZZINESS(real 1.0) quietly KEEPUSING(passthru) SORTWORDS KEEPAMBiguous] 
+    syntax [varlist] using/, S1(string) [OUTfile(string) FUZZINESS(real 1.0) quietly KEEPUSING(passthru) SORTWORDS KEEPAMBiguous AMBIGfile(string)] 
   
     /* drop lev_dist if it already exists */
     cap drop lev_dist
@@ -1457,7 +1466,13 @@ end
       drop any_match
         
       /* export a dataset with list of ambiguous potential matches */
-      export_ambiguous_matches `s1'_master `s1'_using 
+      if !mi("`ambigfile'") {
+        export_ambiguous_matches `varlist' `s1'_master `s1'_using, ambigfile(`ambigfile')
+      }
+
+      else {
+        export_ambiguous_matches `varlist' `s1'_master `s1'_using
+      }
 
       /* Default behavior is to reject matches where there are two very similar targets.
          The default is that the target/using dataset is canonical, so if we can't match one target
